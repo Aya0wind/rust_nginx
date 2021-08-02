@@ -8,6 +8,13 @@ edition = "2018"
 [dependencies]
 mimalloc = { version = "0.1.26", default-features = false }
 tokio = { version = "1.9.0", features = ["full"] }
-hyper = { version = "0.14.11" }
-serde = { version = "1.0.127" }
+hyper = { version = "0.14.11",features=["full"] }
+serde = { version = "1.0.127",features=["derive"] }
 toml = { version = "0.5.8" }
+pretty_env_logger = { version = "0.4.0" }
+log = "0.4"
+
+
+[build-dependencies.config_struct]
+version = "~0.4.0"
+features = ["toml-parsing"]
