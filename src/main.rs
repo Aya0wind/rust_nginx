@@ -18,8 +18,8 @@ async fn main_handle(
     target_server: Client<HttpConnector>,
 ) -> Result<Response<Body>> {
     trace!("Get Request:{:?}", req);
-    let resq =
-    Ok(resp)
+    router::params(&req);
+    Ok(Response::new(Body::from("Hello")))
 }
 
 
@@ -27,14 +27,14 @@ async fn main_handle(
 async fn main() -> std::result::Result<(), Box<dyn std::error::Error + Send + Sync>> {
     pretty_env_logger::init();
 
-    let client = Client::new();
     // For every connection, we must make a `Service` to handle all
     // incoming HTTP requests on said connection.
-    let make_svc = make_service_fn(|_conn| {
+    let make_svc = make_service_fn(move |_conn| {
+        let client = Client::new();
         // This is the `Service` that will handle the connection.
         // `service_fn` is a helper to convert a function that
         // returns a Response into a `Service`.
-        let service = service_fn(move |req| main_handle(req, client));
+        let service = service_fn(move |req| main_handle(req, client.clone()));
 
         // Return the service to hyper.
         async move { Ok::<_,hyper::Error>(service) }
@@ -45,16 +45,17 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error + Send + Sy
     let server1 = Server::bind(&address).serve(make_svc);
 
     let interrupt = tokio::signal::ctrl_c();
-
-
-    tokio::select! {
-        v = server1 =>{
-            v?;
-        }
-        _ = interrupt => {
-            eprintln!("Server interrupted by ctrl-c signal\nBye");
-        }
-    };
-
+    let handle = tokio::spawn(server1);
+    let res = handle.await;
+    tokio::spawn(interrupt).await??;
+    eprintln!("Server interrupted by ctrl-c signal\nBye");
+    // tokio::select! {
+    //     v =  =>{
+    //         v??;
+    //     }
+    //     _ = tokio::spawn(interrupt) => {
+    //         eprintln!("Server interrupted by ctrl-c signal\nBye");
+    //     }
+    // };
     Ok(())
 }
