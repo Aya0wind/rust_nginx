@@ -6,16 +6,16 @@ use hyper::client::HttpConnector;
 use hyper::Result;
 use hyper::service::{make_service_fn, service_fn};
 use mimalloc::MiMalloc;
+use tokio::time::timeout_at;
 
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
 
-mod config_parser;
-mod router;
 
+mod router;
+mod server;
 async fn main_handle(
-    mut req: Request<Body>,
-    target_server: Client<HttpConnector>,
+    req: Request<Body>,
 ) -> Result<Response<Body>> {
     trace!("Get Request:{:?}", req);
     router::params(&req);
@@ -26,27 +26,11 @@ async fn main_handle(
 #[tokio::main]
 async fn main() -> std::result::Result<(), Box<dyn std::error::Error + Send + Sync>> {
     pretty_env_logger::init();
-
-    // For every connection, we must make a `Service` to handle all
-    // incoming HTTP requests on said connection.
-    let make_svc = make_service_fn(move |_conn| {
-        let client = Client::new();
-        // This is the `Service` that will handle the connection.
-        // `service_fn` is a helper to convert a function that
-        // returns a Response into a `Service`.
-        let service = service_fn(move |req| main_handle(req, client.clone()));
-
-        // Return the service to hyper.
-        async move { Ok::<_,hyper::Error>(service) }
-    });
-
-    let address = ([127, 0, 0, 1], 80).into();
-
-    let server1 = Server::bind(&address).serve(make_svc);
-
+    let address=([127,0,0,1],80).into();
+    let server = server::make_server(&address);
     let interrupt = tokio::signal::ctrl_c();
-    let handle = tokio::spawn(server1);
-    let res = handle.await;
+    //let handle = tokio::spawn(server1);
+    //let res = handle.await;
     tokio::spawn(interrupt).await??;
     eprintln!("Server interrupted by ctrl-c signal\nBye");
     // tokio::select! {
