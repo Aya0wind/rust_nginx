@@ -10,29 +10,29 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use std::borrow::BorrowMut;
 use mlua::Lua;
+use tokio::task::JoinHandle;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 
 
 async fn main_handle(
     req: Request<Body>,
 ) -> hyper::Result<Response<Body>> {
-    let lua = Lua::new();
     trace!("Get Request:{:?}", req);
+
     Ok(Response::new(Body::from(r##""##)))
 }
 
 struct Config;
 
 
-struct ServerContext{
-    config:Arc<Config>
-}
-impl ServerContext{
-    fn update(&mut self){
-        let boxed_config = Box::new(Config{});
-    }
+struct ServerContext<F:Future>{
+    config:Arc<Config>,
+    service_task:F,
+    signal_task:F,
 }
 
-pub async fn make_server(
+pub fn make_server(
     address: SocketAddr
 ) ->impl Future<Output=Result<()>> {
     let make_service = make_service_fn(|_conn|{
