@@ -2,43 +2,40 @@
 extern crate log;
 
 use mimalloc::MiMalloc;
-use std::collections::HashMap;
-use mlua::Lua;
-use std::sync::{Arc, Mutex};
+
+use tokio::task::LocalSet;
+use crate::config::{Config, GlobalConfig, ServerConfig, Scheme};
+use crate::server::Server;
+use futures::future::{Either};
 
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
 
-
-mod router;
+// mod router;
+// mod error;
 mod server;
+mod config;
+// mod resource_resolver;
+mod shell;
 
-
-fn main() -> std::result::Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let rt  = tokio::runtime::Builder::new_multi_thread().worker_threads(16).enable_all().build()?;
-    rt.block_on(async {
-        let mut context=HashMap::<i32,i32>::new();
-        pretty_env_logger::init();
-        let address0=([0,0,0,0],80).into();
-        let address1=([0,0,0,0],81).into();
-        let server0 = server::make_server(address0);
-        let handle0 = tokio::spawn(server0.await);
-        let server1 = server::make_server(address1);
-        let handle1 = tokio::spawn(server1.await);
-        let mut vec = vec![handle0];
-        vec.push(handle1);
-        let interrupt = tokio::signal::ctrl_c();
-
-        tokio::spawn(interrupt).await??;
-        eprintln!("Server interrupted by ctrl-c signal\nBye");
-        // tokio::select! {
-        //     v =  =>{
-        //         v??;
-        //     }
-        //     _ = tokio::spawn(interrupt) => {
-        //         eprintln!("Server interrupted by ctrl-c signal\nBye");
-        //     }
-        // };
-        Ok(())
-    })
+#[tokio::main]
+async fn main() -> std::result::Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    pretty_env_logger::init();
+    let config = Config{ global: GlobalConfig {}, servers: vec![
+        ServerConfig{ bind_address: ([127,0,0,1],80).into(), scheme: Scheme::HTTP },
+        ServerConfig{ bind_address: ([127,0,0,1],81).into(), scheme: Scheme::HTTP },
+        ServerConfig{ bind_address: ([127,0,0,1],82).into(), scheme: Scheme::HTTP },
+        ServerConfig{ bind_address: ([127,0,0,1],83).into(), scheme: Scheme::HTTP },
+    ] };
+    let mut server = Server::new(config);
+    let local_tasks = LocalSet::new();
+    tokio::select! {
+        server_result=server.run()=>{
+            eprintln!("error exit!:{:?}",server_result);
+        }
+        shell_result=local_tasks.run_until(shell::shell_handler())=>{
+            eprintln!("shell exit!:{:?}",shell_result);
+        }
+    }
+    Ok(())
 }
