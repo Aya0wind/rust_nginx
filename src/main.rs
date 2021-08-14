@@ -7,6 +7,8 @@ use tokio::task::LocalSet;
 use crate::config::{Config, GlobalConfig, ServerConfig, Scheme};
 use crate::server::Server;
 use futures::future::{Either};
+use mlua::Lua;
+use std::sync::{Mutex,Arc};
 
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
@@ -18,10 +20,15 @@ mod config;
 // mod resource_resolver;
 mod shell;
 
+std::thread_local! {
+
+}
+
 #[tokio::main]
 async fn main() -> std::result::Result<(), Box<dyn std::error::Error + Send + Sync>> {
     pretty_env_logger::init();
-    let config = Config{ global: GlobalConfig {}, servers: vec![
+    let lua:Arc<Mutex<Lua>> =Arc::new(Mutex::new(Lua::new()));
+    let config = Config{ global: GlobalConfig {lua}, servers: vec![
         ServerConfig{ bind_address: ([127,0,0,1],80).into(), scheme: Scheme::HTTP },
         ServerConfig{ bind_address: ([127,0,0,1],81).into(), scheme: Scheme::HTTP },
         ServerConfig{ bind_address: ([127,0,0,1],82).into(), scheme: Scheme::HTTP },

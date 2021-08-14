@@ -1,7 +1,10 @@
 use std::net::SocketAddr;
+use mlua::Lua;
+use std::sync::{Mutex, Arc};
+
 #[derive(Debug,Clone)]
 pub struct GlobalConfig {
-
+    pub lua:Arc<Mutex<Lua>>
 }
 
 #[derive(Debug,Clone)]
