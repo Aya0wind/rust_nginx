@@ -1,48 +1,56 @@
-#[macro_use]
-extern crate log;
+use crate::config::{Config};
+use clap::Parser;
+use log::{error, info};
 
-use mimalloc::MiMalloc;
-
-use tokio::task::LocalSet;
-use crate::config::{Config, GlobalConfig, ServerConfig, Scheme};
+mod lua;
+mod error;
+use error::Result;
+use tokio::sync::mpsc;
+use tokio_util::sync::CancellationToken;
 use crate::server::Server;
-use futures::future::{Either};
-use mlua::Lua;
-use std::sync::{Mutex,Arc};
+use crate::shell::ShellCommand;
 
 #[global_allocator]
-static GLOBAL: MiMalloc = MiMalloc;
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
-// mod router;
-// mod error;
-mod server;
 mod config;
-// mod resource_resolver;
+mod server;
+mod proxy_server;
 mod shell;
-
-std::thread_local! {
-
-}
-
+mod worker;
+mod args;
 #[tokio::main]
-async fn main() -> std::result::Result<(), Box<dyn std::error::Error + Send + Sync>> {
+async fn main() -> Result<()> {
     pretty_env_logger::init();
-    let lua:Arc<Mutex<Lua>> =Arc::new(Mutex::new(Lua::new()));
-    let config = Config{ global: GlobalConfig {lua}, servers: vec![
-        ServerConfig{ bind_address: ([127,0,0,1],80).into(), scheme: Scheme::HTTP },
-        ServerConfig{ bind_address: ([127,0,0,1],81).into(), scheme: Scheme::HTTP },
-        ServerConfig{ bind_address: ([127,0,0,1],82).into(), scheme: Scheme::HTTP },
-        ServerConfig{ bind_address: ([127,0,0,1],83).into(), scheme: Scheme::HTTP },
-    ] };
-    let mut server = Server::new(config);
-    let local_tasks = LocalSet::new();
-    tokio::select! {
-        server_result=server.run()=>{
-            eprintln!("error exit!:{:?}",server_result);
+    let command_args = args::Args::parse();
+    let (
+        shell_sender,
+        shell_receiver
+    ) = mpsc::channel::<ShellCommand>(5);
+    let config = Config::load_yaml_config_from_path(&command_args.config)?;
+    info!("successfully loaded config file");
+    let server_shutdown_token = CancellationToken::new();
+    let server = Server::new(config, shell_receiver)?;
+    let server_future = server.start(server_shutdown_token.clone());
+    let shell_future = shell::shell_handler(shell_sender);
+    let interrupt_signal= tokio::signal::ctrl_c();
+    tokio::select!(
+        server_result = server_future=>{
+            if let Err(e) = server_result{
+                error!("server error:{}",e);
+            }
+        },
+        shell_result = shell_future=>{
+            if let Err(e) = shell_result{
+                error!("shell error:{}",e);
+            }
+            server_shutdown_token.cancel();
+        },
+        _ = interrupt_signal=>{
+            info!("receive interrupt signal");
+            server_shutdown_token.cancel();
         }
-        shell_result=local_tasks.run_until(shell::shell_handler())=>{
-            eprintln!("shell exit!:{:?}",shell_result);
-        }
-    }
+    );
+    info!("server shutdown, bye");
     Ok(())
 }
