@@ -1,0 +1,51 @@
+{
+  "max_connection": 8,
+  "log": {
+    "level": "debug",
+    "error_log": {
+      "level": "debug",
+      "path": "error.log",
+      "format": "text"
+    },
+    "access_log": {
+      "level": "debug",
+      "format": "colored_text"
+    }
+  },
+  "lua": {
+    "enabled": false,
+    "init": "info(\"init\")\n",
+    "globals": null
+  },
+  "servers": {
+    "http": {
+      "entry1": {
+        "ip": "",
+        "port": 80,
+        "error_page": {
+          "500": "error.html",
+          "501": "error.html",
+          "502": "error.html"
+        },
+        "lua": {
+          "enabled": false,
+          "init": "function init()\n    info(\"init\")\nend\n"
+        },
+        "http_proxy": {
+          "/": "http://www.baidu.com",
+          "/test": "http://www.baidu.com"
+        }
+      },
+      "entry2": {
+        "ip": "127.0.0.1",
+        "port": 80
+      }
+    },
+    "tcp": {
+      "entry1": {
+        "ip": "127.0.0.1",
+        "port": 80
+      }
+    }
+  }
+}

@@ -6,13 +6,18 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-futures="0.3.16"
-mimalloc = { version = "0.1.26", default-features = false }
-tokio = { version = "1.9.0", features = ["full"] }
-hyper = { version = "0.14.11",features=["full"] }
-serde = { version = "1.0.127",features=["derive"] }
+mimalloc = { version = "0.1.26"}
+tokio = { version = "1.17.0",features=["full"] }
+tokio-util = "0.7.0"
+hyper = { version = "0.14.17",features=["full"] }
+serde = { version = "1.0.136",features=["derive"] }
+serde_yaml = { version = "0.8.23" }
+serde_json = { version = "1.0.79" }
 toml = { version = "0.5.8" }
 pretty_env_logger = { version = "0.4.0" }
 log = "0.4"
-mlua = { version = "0.6.2",features=["vendored","luajit","send"] }
-lazy_static = "1.4.0"
+mlua = { version = "0.7.3",features=["vendored","luajit"] }
+thiserror = "1.0.30"
+futures = "0.3.21"
+anyhow = "1.0.55"
+clap = { version = "4.2.7", features = ["derive"] }

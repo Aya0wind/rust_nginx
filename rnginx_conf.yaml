@@ -1,0 +1,44 @@
+max_connection: 8
+log:
+  level: "debug"
+  error_log:
+    level: "debug"
+    path: "error.log"
+    format: "text"
+  access_log:
+    level: "debug"
+    format: "colored_text"
+lua:
+  enabled: false
+  init: |
+    info("init")
+  globals:
+servers:
+  http:
+    entry1:
+      ip: ""
+      port: 80
+      error_page:
+        "500": "error.html"
+        "501": "error.html"
+        "502": "error.html"
+      lua:
+        enabled: false
+        init: |
+            function init()
+                info("init")
+            end
+      http_proxy:
+        "/" :
+          - "http://www.baidu.com"
+          - "http://www.google.com"
+        "/test" : "http://www.baidu.com"
+    entry2:
+      ip: "127.0.0.1"
+      port: 80
+  tcp:
+    entry1:
+        ip: "127.0.0.1"
+        port: 80
+
+  
