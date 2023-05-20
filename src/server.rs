@@ -1,12 +1,15 @@
+use std::collections::HashMap;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 use crate::config::Config;
-use crate::error::Result;
+use crate::error::{Error, Result};
 use crate::shell::ShellCommand;
+use crate::worker;
 
 pub struct Server{
     config:Config,
     command_channel:mpsc::Receiver<ShellCommand>,
+    worker_tasks:HashMap<String,tokio::task::JoinHandle<Result<()>>>,
 }
 
 impl Server{
@@ -20,15 +23,28 @@ impl Server{
         })
     }
 
+    fn create_worker_task(&mut self,worker_name:String,shutdown_token:CancellationToken)->Result<()>{
+        let worker_config = self.config.get_worker_config(&worker_name)?;
+        let worker = worker::ServerWorker::new(worker_config)?;
+        let worker_task = tokio::spawn(async move{
+            worker.run().await?;
+            Ok::<_,Error>(())
+        });
+        self.worker_tasks.insert(worker_name,worker_task);
+        Ok(())
+    }
+
+    fn create_all_worker_tasks(&mut self,shutdown_token:CancellationToken)->Result<()>{
+        for worker_name in self.config.get_all_worker_names(){
+            self.create_worker_task(worker_name.clone(),shutdown_token.clone())?;
+        }
+        Ok(())
+    }
+
+
     pub async fn start(&self,server_shutdown_token:CancellationToken,)->Result<()>{
-        tokio::select!(
-            canceled = server_shutdown_token.cancelled()=>{
 
-            },
-            _ =tokio::time::sleep(tokio::time::Duration::from_secs(3))=>{
-
-            }
-        );
+        futures::future::join_all(self.worker_tasks.values()).await;
         Ok(())
     }
 }

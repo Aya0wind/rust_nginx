@@ -15,6 +15,12 @@ pub struct Config{
     pub common:CommonConfig,
 }
 
+impl Config {
+    pub(crate) fn get_worker_config(&self, name: &str) -> _ {
+        self.servers.
+    }
+}
+
 impl Config{
     pub fn load_yaml_config_from_path<P:AsRef<Path>>(path:P)->Result<Self>{
         let reader = BufReader::new(std::fs::File::open(path)?);
