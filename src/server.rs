@@ -25,7 +25,7 @@ impl Server{
             canceled = server_shutdown_token.cancelled()=>{
 
             },
-            _ =tokio::time::sleep(tokio::time::Duration::from_secs(10))=>{
+            _ =tokio::time::sleep(tokio::time::Duration::from_secs(3))=>{
 
             }
         );

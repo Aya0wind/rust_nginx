@@ -7,6 +7,7 @@ mod error;
 use error::Result;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
+use crate::error::Error;
 use crate::server::Server;
 use crate::shell::ShellCommand;
 
@@ -30,27 +31,23 @@ async fn main() -> Result<()> {
     let config = Config::load_yaml_config_from_path(&command_args.config)?;
     info!("successfully loaded config file");
     let server_shutdown_token = CancellationToken::new();
-    let server = Server::new(config, shell_receiver)?;
-    let server_future = server.start(server_shutdown_token.clone());
-    let shell_future = shell::shell_handler(shell_sender);
-    let interrupt_signal= tokio::signal::ctrl_c();
-    tokio::select!(
-        server_result = server_future=>{
-            if let Err(e) = server_result{
-                error!("server error:{}",e);
-            }
-        },
-        shell_result = shell_future=>{
-            if let Err(e) = shell_result{
-                error!("shell error:{}",e);
-            }
-            server_shutdown_token.cancel();
-        },
-        _ = interrupt_signal=>{
-            info!("receive interrupt signal");
-            server_shutdown_token.cancel();
-        }
-    );
-    info!("server shutdown, bye");
-    Ok(())
+    let shell_future = shell::shell_handler(shell_sender,server_shutdown_token.clone());
+    let interrupt_signal= shell::wait_for_sigint(server_shutdown_token.clone());
+    let server_future = tokio::spawn(async move{
+        let server = Server::new(config, shell_receiver)?;
+        server.start(server_shutdown_token.clone()).await?;
+        info!("server task exit");
+        Ok::<_,Error>(())
+    });
+    tokio::join!(
+        shell_future,
+        interrupt_signal,
+        server_future
+    ).0?;
+    info!("server exit! bye bye!");
+    // because tokio::ioA::stdin() is impossible to be canceled
+    // so we have to exit the process to break the blocking read
+    // when call this exit, all the tasks except shell read will be canceled
+    // so this operation is safe
+    std::process::exit(0)
 }
